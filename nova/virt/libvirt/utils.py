@@ -585,6 +585,25 @@ def is_valid_hostname(hostname: str) -> bool:
     return bool(re.match(r"^[\w\-\.:]+$", hostname))
 
 
+def is_luks_inside_qcow2(image_path: str) -> bool:
+    """Check if the given image is a qcow2 file with luks inside.
+
+    :param image_path: the path to the image file
+    :returns: True if the image is a qcow2 file with luks inside, False
+              otherwise
+    """
+    img_info = images.privileged_qemu_img_info(image_path)
+    LOG.warning('XXX: is_luks_inside_qcow2 %s', img_info)
+    if img_info.format_specific:
+        return (
+            img_info.file_format == 'qcow2' and
+            img_info.format_specific.get('data', {})
+            .get('encrypt', {})
+            .get('format', {}) == 'luks'
+        )
+    return False
+
+
 def version_to_string(version: ty.Tuple[int, int, int]) -> str:
     """Returns string version based on tuple"""
     return '.'.join([str(x) for x in version])
