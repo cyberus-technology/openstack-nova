@@ -1290,12 +1290,20 @@ class ComputeAPI(object):
                     new_attachment_id):
         version = self._ver(ctxt, '5.0')
         client = self.router.client(ctxt)
+        compute_host = _compute_host(None, instance)
         kwargs = dict(instance=instance,
                       old_volume_id=old_volume_id,
                       new_volume_id=new_volume_id,
                       new_attachment_id=new_attachment_id)
-        cctxt = client.prepare(
-            server=_compute_host(None, instance), version=version)
+        LOG.info('Casting swap_volume RPC to compute host %(host)s: '
+                 'old_volume=%(old_volume)s new_volume=%(new_volume)s '
+                 'new_attachment=%(new_attachment)s',
+                 {'host': compute_host,
+                  'old_volume': old_volume_id,
+                  'new_volume': new_volume_id,
+                  'new_attachment': new_attachment_id},
+                 instance=instance)
+        cctxt = client.prepare(server=compute_host, version=version)
         cctxt.cast(ctxt, 'swap_volume', **kwargs)
 
     def get_host_uptime(self, ctxt, host):

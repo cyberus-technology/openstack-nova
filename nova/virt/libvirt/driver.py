@@ -2277,6 +2277,18 @@ class LibvirtDriver(driver.ComputeDriver):
         :param: hw_firmware_type: fields.FirmwareType if set in the imagemeta
         """
         dev = guest.get_block_device(disk_dev)
+        LOG.info('Starting libvirt block copy for swap_volume: '
+                 'disk_dev=%(disk_dev)s target_dev=%(target_dev)s '
+                 'source_path=%(source_path)s '
+                 'source_protocol=%(source_protocol)s '
+                 'resize_to=%(resize_to)s '
+                 'hw_firmware_type=%(hw_firmware_type)s',
+                 {'disk_dev': disk_dev,
+                  'target_dev': conf.target_dev,
+                  'source_path': conf.source_path,
+                  'source_protocol': getattr(conf, 'source_protocol', None),
+                  'resize_to': resize_to,
+                  'hw_firmware_type': hw_firmware_type})
 
         # Save a copy of the domain's persistent XML file. We'll use this
         # to redefine the domain if anything fails during the volume swap.
@@ -2326,6 +2338,12 @@ class LibvirtDriver(driver.ComputeDriver):
             # live config after the volume was updated to use when we redefine
             # the domain.
             xml = guest.get_xml_desc(dump_inactive=False, dump_sensitive=True)
+            LOG.info('Completed libvirt block copy for swap_volume: '
+                     'disk_dev=%(disk_dev)s target_dev=%(target_dev)s '
+                     'resize_to=%(resize_to)s',
+                     {'disk_dev': disk_dev,
+                      'target_dev': conf.target_dev,
+                      'resize_to': resize_to})
         finally:
             self._host.write_instance_config(xml)
 
@@ -2345,6 +2363,26 @@ class LibvirtDriver(driver.ComputeDriver):
         disk_dev = mountpoint.rpartition("/")[2]
         if not guest.get_disk(disk_dev):
             raise exception.DiskNotFound(location=disk_dev)
+        LOG.info('Preparing libvirt swap_volume: old_volume=%(old_volume)s '
+                 'new_volume=%(new_volume)s mountpoint=%(mountpoint)s '
+                 'disk_dev=%(disk_dev)s resize_to=%(resize_to)s '
+                 'old_connection_type=%(old_connection_type)s '
+                 'new_connection_type=%(new_connection_type)s '
+                 'old_serial=%(old_serial)s new_serial=%(new_serial)s',
+                 {'old_volume': driver_block_device.get_volume_id(
+                     old_connection_info),
+                  'new_volume': driver_block_device.get_volume_id(
+                      new_connection_info),
+                  'mountpoint': mountpoint,
+                  'disk_dev': disk_dev,
+                  'resize_to': resize_to,
+                  'old_connection_type': old_connection_info.get(
+                      'driver_volume_type'),
+                  'new_connection_type': new_connection_info.get(
+                      'driver_volume_type'),
+                  'old_serial': old_connection_info.get('serial'),
+                  'new_serial': new_connection_info.get('serial')},
+                 instance=instance)
         disk_info = {
             'dev': disk_dev,
             'bus': blockinfo.get_disk_bus_for_disk_dev(
@@ -2363,6 +2401,19 @@ class LibvirtDriver(driver.ComputeDriver):
             instance, new_connection_info, disk_info)
         hw_firmware_type = instance.image_meta.properties.get(
             'hw_firmware_type')
+        LOG.info('Connected new volume for libvirt swap_volume: '
+                 'new_volume=%(new_volume)s mountpoint=%(mountpoint)s '
+                 'disk_dev=%(disk_dev)s target_dev=%(target_dev)s '
+                 'source_path=%(source_path)s '
+                 'source_protocol=%(source_protocol)s',
+                 {'new_volume': driver_block_device.get_volume_id(
+                     new_connection_info),
+                  'mountpoint': mountpoint,
+                  'disk_dev': disk_dev,
+                  'target_dev': conf.target_dev,
+                  'source_path': conf.source_path,
+                  'source_protocol': getattr(conf, 'source_protocol', None)},
+                 instance=instance)
 
         try:
             self._swap_volume(guest, disk_dev, conf,
@@ -2372,6 +2423,16 @@ class LibvirtDriver(driver.ComputeDriver):
                 self._disconnect_volume(context, new_connection_info, instance)
 
         self._disconnect_volume(context, old_connection_info, instance)
+        LOG.info('Completed libvirt swap_volume cleanup: '
+                 'old_volume=%(old_volume)s new_volume=%(new_volume)s '
+                 'mountpoint=%(mountpoint)s disk_dev=%(disk_dev)s',
+                 {'old_volume': driver_block_device.get_volume_id(
+                     old_connection_info),
+                  'new_volume': driver_block_device.get_volume_id(
+                      new_connection_info),
+                  'mountpoint': mountpoint,
+                  'disk_dev': disk_dev},
+                 instance=instance)
 
     def _get_existing_domain_xml(self, instance, network_info,
                                  block_device_info=None):

@@ -5376,6 +5376,17 @@ class API:
                                     vm_states.RESIZED])
     def swap_volume(self, context, instance, old_volume, new_volume):
         """Swap volume attached to an instance."""
+        LOG.info('Starting swap_volume request: old_volume=%(old_volume)s '
+                 'new_volume=%(new_volume)s old_size=%(old_size)s '
+                 'new_size=%(new_size)s old_status=%(old_status)s '
+                 'new_status=%(new_status)s',
+                 {'old_volume': old_volume['id'],
+                  'new_volume': new_volume['id'],
+                  'old_size': old_volume.get('size'),
+                  'new_size': new_volume.get('size'),
+                  'old_status': old_volume.get('status'),
+                  'new_status': new_volume.get('status')},
+                 instance=instance)
         # The caller likely got the instance from volume['attachments']
         # in the first place, but let's sanity check.
         if not old_volume.get('attachments', {}).get(instance.uuid):
@@ -5434,6 +5445,18 @@ class API:
             context, instance, instance_actions.SWAP_VOLUME)
 
         try:
+            LOG.info('Sending swap_volume request to compute: '
+                     'old_volume=%(old_volume)s new_volume=%(new_volume)s '
+                     'bdm_volume=%(bdm_volume)s device=%(device)s '
+                     'old_attachment=%(old_attachment)s '
+                     'new_attachment=%(new_attachment)s',
+                     {'old_volume': old_volume['id'],
+                      'new_volume': new_volume['id'],
+                      'bdm_volume': bdm.volume_id,
+                      'device': bdm.device_name,
+                      'old_attachment': bdm.attachment_id,
+                      'new_attachment': new_attachment_id},
+                     instance=instance)
             self.compute_rpcapi.swap_volume(
                     context, instance=instance,
                     old_volume_id=old_volume['id'],

@@ -7820,6 +7820,31 @@ class ComputeManager(manager.Manager):
             # Both new and old info might contain password
             LOG.debug(strutils.mask_password(msg), instance=instance)
 
+            LOG.info('Calling driver swap_volume: old_volume=%(old_volume)s '
+                     'new_volume=%(new_volume)s mountpoint=%(mountpoint)s '
+                     'resize_to=%(resize_to)s '
+                     'old_connection_type=%(old_connection_type)s '
+                     'new_connection_type=%(new_connection_type)s '
+                     'old_serial=%(old_serial)s new_serial=%(new_serial)s '
+                     'new_attachment=%(new_attachment)s '
+                     'old_bdm_attachment=%(old_bdm_attachment)s '
+                     'multiattach=%(multiattach)s '
+                     'is_cinder_migration=%(is_cinder_migration)s',
+                     {'old_volume': old_volume_id,
+                      'new_volume': new_volume_id,
+                      'mountpoint': mountpoint,
+                      'resize_to': resize_to,
+                      'old_connection_type': old_cinfo.get(
+                          'driver_volume_type'),
+                      'new_connection_type': new_cinfo.get(
+                          'driver_volume_type'),
+                      'old_serial': old_cinfo.get('serial'),
+                      'new_serial': new_cinfo.get('serial'),
+                      'new_attachment': new_attachment_id,
+                      'old_bdm_attachment': bdm.attachment_id,
+                      'multiattach': new_cinfo.get('multiattach', False),
+                      'is_cinder_migration': is_cinder_migration},
+                     instance=instance)
             self.driver.swap_volume(context, old_cinfo, new_cinfo, instance,
                                     mountpoint, resize_to)
             if new_attachment_id:
@@ -7828,6 +7853,14 @@ class ComputeManager(manager.Manager):
                    "connection_info is now : %(new_cinfo)s" %
                    {'new_cinfo': new_cinfo})
             LOG.debug(strutils.mask_password(msg))
+            LOG.info('Driver swap_volume completed: old_volume=%(old_volume)s '
+                     'new_volume=%(new_volume)s mountpoint=%(mountpoint)s '
+                     'new_attachment=%(new_attachment)s',
+                     {'old_volume': old_volume_id,
+                      'new_volume': new_volume_id,
+                      'mountpoint': mountpoint,
+                      'new_attachment': new_attachment_id},
+                     instance=instance)
         except Exception as ex:
             failed = True
             with excutils.save_and_reraise_exception():
@@ -7934,6 +7967,13 @@ class ComputeManager(manager.Manager):
         :param instance: Instance with original_volume_id attached
         :param new_attachment_id: ID of the new attachment for new_volume_id
         """
+        LOG.info('Received swap_volume RPC: old_volume=%(old_volume)s '
+                 'new_volume=%(new_volume)s new_attachment=%(new_attachment)s',
+                 {'old_volume': old_volume_id,
+                  'new_volume': new_volume_id,
+                  'new_attachment': new_attachment_id},
+                 instance=instance)
+
         @utils.synchronized(instance.uuid)
         def _do_locked_swap_volume(context, old_volume_id, new_volume_id,
                                    instance, new_attachment_id):
@@ -7978,8 +8018,23 @@ class ComputeManager(manager.Manager):
         if new_vol_size > old_vol_size:
             resize_to = new_vol_size
 
-        LOG.info('Swapping volume %(old_volume)s for %(new_volume)s',
-                 {'old_volume': old_volume_id, 'new_volume': new_volume_id},
+        LOG.info('Swapping volume %(old_volume)s for %(new_volume)s: '
+                 'bdm_volume=%(bdm_volume)s device=%(device)s '
+                 'old_attachment=%(old_attachment)s '
+                 'new_attachment=%(new_attachment)s '
+                 'old_size=%(old_size)s new_size=%(new_size)s '
+                 'resize_to=%(resize_to)s '
+                 'is_cinder_migration=%(is_cinder_migration)s',
+                 {'old_volume': old_volume_id,
+                  'new_volume': new_volume_id,
+                  'bdm_volume': bdm.volume_id,
+                  'device': bdm.device_name,
+                  'old_attachment': bdm.attachment_id,
+                  'new_attachment': new_attachment_id,
+                  'old_size': old_vol_size,
+                  'new_size': new_vol_size,
+                  'resize_to': resize_to,
+                  'is_cinder_migration': is_cinder_migration},
                  instance=instance)
         comp_ret, new_cinfo = self._swap_volume(context,
                                                 instance,
@@ -8024,6 +8079,19 @@ class ComputeManager(manager.Manager):
                   "%(updates)s", {'volume_id': bdm.volume_id,
                                   'updates': values},
                   instance=instance)
+        LOG.info('Updating BDM after swap_volume: old_volume=%(old_volume)s '
+                 'new_volume=%(new_volume)s save_volume=%(save_volume)s '
+                 'bdm_volume=%(bdm_volume)s device=%(device)s '
+                 'attachment=%(attachment)s resize_to=%(resize_to)s',
+                 {'old_volume': old_volume_id,
+                  'new_volume': new_volume_id,
+                  'save_volume': save_volume_id,
+                  'bdm_volume': bdm.volume_id,
+                  'device': bdm.device_name,
+                  'attachment': values.get('attachment_id',
+                                           bdm.attachment_id),
+                  'resize_to': resize_to},
+                 instance=instance)
         bdm.update(values)
         bdm.save()
 
@@ -8031,6 +8099,12 @@ class ComputeManager(manager.Manager):
             context, instance, self.host,
             fields.NotificationPhase.END,
             old_volume_id, new_volume_id)
+        LOG.info('Completed swap_volume: old_volume=%(old_volume)s '
+                 'new_volume=%(new_volume)s save_volume=%(save_volume)s',
+                 {'old_volume': old_volume_id,
+                  'new_volume': new_volume_id,
+                  'save_volume': save_volume_id},
+                 instance=instance)
 
     @wrap_exception()
     def remove_volume_connection(self, context, volume_id, instance):
